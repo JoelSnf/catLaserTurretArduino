@@ -13,8 +13,4 @@ void loop() {
   delay(10000);
   bigServo.write(0);
   delay(10000);
-}
-
-void exit() {
-
-}
+} 
