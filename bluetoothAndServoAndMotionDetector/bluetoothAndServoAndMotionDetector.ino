@@ -10,6 +10,7 @@ Servo smallServo; // pin 10
 // mode 4 = active (shining laser)
 // mode 5 = dispenseTreats (dispensing treats)
 int mode = 3; // I would have used strings instead of integers to represent modes but I keen on saving memory
+//went to put my socks on this morning but one of thenm had pineaplle juice on :( - jari 23/05/2024
 
 const int motionSensorPin = A2;
 
@@ -33,18 +34,16 @@ BLEService bleService("180A");
 BLEByteCharacteristic modeSwitchCharacteristic("2A57", BLERead | BLEWrite);
 
 BLEByteCharacteristic manualAngleZControl("1A57", BLERead | BLEWrite);
+
 BLEByteCharacteristic manualAngleXControl("0A57", BLERead | BLEWrite);
 
 BLEByteCharacteristic saveCurrentPosition("1A58", BLERead | BLEWrite);
 
-
 void bluetoothSetup() {
   Serial.println("Running bluetooth setup...");
 
-  if (!BLE.begin()) {
+  if (!BLE.begin()) { // ble.begin is a boolean which is true if setting up bluetooth goes well
     Serial.println("starting Bluetooth® Low Energy failed!");
-
-    while (1);
   }
 
   // set advertised local name and service UUID:
@@ -70,6 +69,7 @@ void bluetoothSetup() {
 
   // start bluetoothAdvertising
   BLE.advertise();
+    while (1);
   Serial.println("bluetooth advertising... ");
 }
 
@@ -138,7 +138,7 @@ void loop() {
         smallServo.write(angleX);
       }
 
-      if (saveCurrentPosition.written()) {
+      if (saveCurrentPosition.written()) { // If the user wants, we can save the current position 
         if (saveCurrentPosition.value() == 1) {
           userZPos1 = angleZ;
           userXPos1 = angleX;
@@ -170,8 +170,8 @@ void loop() {
       long timeActive;
       timeActive = millis() - changedModeTime;
 
-      int cycleTime;
-      cycleTime = timeActive % 3000;
+      int cycleTime; // cycleTime represents how far through the rotation we are. timeActive goes from 0 to 30 seconds, cycletime goes from 0 to 3 seconds over and over
+      cycleTime = timeActive % 3000; // % is modulo in c
 
       int smallServoPos, bigServoPos;
 
@@ -217,7 +217,7 @@ void loop() {
 }
 
 bool checkIfMovement() { // Credit to Tom for this function ! And for adjusting the motion sensor
-  int pirState = analogRead(motionSensorPin);
+  int pirState = analogRead(motionSensorPin); // pir= passive infrared. (The motion sensor)
   if (pirState > 600) {
   return true;
   }
@@ -231,10 +231,10 @@ void changeTurretMode(int requestedMode) { // Use this instead of mode = X becau
   modeSwitchCharacteristic.writeValue(requestedMode); // update the bluetooth characteristic so the app knows what state the system is in (This doesn't seem to work ! BUGGED)
   Serial.println("Changing to mode:");
   Serial.println(requestedMode);
-  changedModeTime = millis();
+  changedModeTime = millis(); // Save the time at which we changed mode. This is helpful when figuring out how long we've been in the latest mode
 
-  if (requestedMode == 4) {
-    digitalWrite(5, HIGH);
+  if (requestedMode == 4 or requestedMode == 2) { // if we're going into active mode, switch on the laser. (And vice versa)
+    digitalWrite(5, HIGH); // set the voltage at the pin to be high
   } else {
     digitalWrite(5, LOW);
   }
