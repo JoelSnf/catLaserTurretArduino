@@ -9,7 +9,7 @@ Servo smallServo; // pin 10
 // mode 3 = scanning (watching for movement)
 // mode 4 = active (shining laser)
 // mode 5 = dispenseTreats (dispensing treats)
-int mode = 3; // I would have used strings instead of integers to represent modes but I keen on saving memory
+int mode = 4; // I would have used strings instead of integers to represent modes but I keen on saving memory
 //went to put my socks on this morning but one of thenm had pineaplle juice on :( - jari 23/05/2024
 
 const int motionSensorPin = A2;
@@ -80,6 +80,7 @@ void setup() {
   smallServo.attach(10); //   (I suspect they are the only ones with sufficient PWM support)
 
   pinMode(5, OUTPUT); // For controlling the laser
+  pinMode(7, OUTPUT); // For the treat dispenser 
 
   bluetoothSetup();
 }
@@ -207,11 +208,16 @@ void loop() {
 
     case 5:
       // dispenseTreats
+      timeActive = millis() - changedModeTime;
 
-      // 
+      digitalWrite(7, HIGH);
 
-      break;
-    
+      if (timeActive > 5000) {
+        changeTurretMode(3);
+      }
+      
+
+      break;   
     
   }
 }
