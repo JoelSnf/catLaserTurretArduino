@@ -9,10 +9,17 @@ Servo smallServo; // pin 10
 // mode 3 = scanning (watching for movement)
 // mode 4 = active (shining laser)
 // mode 5 = dispenseTreats (dispensing treats)
-int mode = 4; // I would have used strings instead of integers to represent modes but I keen on saving memory
-//went to put my socks on this morning but one of thenm had pineaplle juice on :( - jari 23/05/2024
+int mode = 5; // I would have used strings instead of integers to represent modes but I keen on saving memory
+
+int laserShiningTime = 20000 ; // Time to shine the laser, in milliseconds
+int cooldownPeriod = 2000 ; // Time between turning laser off and re-activating, in milliseconds.
+int cycleLength = 3000 ; // Time between for laser to be position x and looping back to position x. in milliseconds 
+int treatDispenseTime = 5000 ; // Amount of time to spend dispensing treats. In milliseconds
+
+int activesPerTreatDispense = 3; // Amount of times the turret activates before it will dispense treats.
 
 const int motionSensorPin = A2;
+const int pmdcPin = 7;
 
 int angleZ = 135;
 int angleX = 90;
@@ -34,7 +41,6 @@ BLEService bleService("180A");
 BLEByteCharacteristic modeSwitchCharacteristic("2A57", BLERead | BLEWrite);
 
 BLEByteCharacteristic manualAngleZControl("1A57", BLERead | BLEWrite);
-
 BLEByteCharacteristic manualAngleXControl("0A57", BLERead | BLEWrite);
 
 BLEByteCharacteristic saveCurrentPosition("1A58", BLERead | BLEWrite);
@@ -69,7 +75,6 @@ void bluetoothSetup() {
 
   // start bluetoothAdvertising
   BLE.advertise();
-    while (1);
   Serial.println("bluetooth advertising... ");
 }
 
@@ -80,7 +85,7 @@ void setup() {
   smallServo.attach(10); //   (I suspect they are the only ones with sufficient PWM support)
 
   pinMode(5, OUTPUT); // For controlling the laser
-  pinMode(7, OUTPUT); // For the treat dispenser 
+  pinMode(pmdcPin, OUTPUT); // For the treat dispenser 
 
   bluetoothSetup();
 }
@@ -158,7 +163,7 @@ void loop() {
     case 3:
       // scanning
 
-      if (checkIfMovement() && (millis() - changedModeTime > 2000) ) { // if movement spotted, and we've been scanning for 2 seconds. (This ensures we don't pickup movement from the turret itself.)
+      if (checkIfMovement() && (millis() - changedModeTime > cooldownPeriod) ) { // if movement spotted, and we've been scanning for 2 seconds. (This ensures we don't pickup movement from the turret itself.)
         changeTurretMode(4);
         Serial.println("Movement detected! Activating...");
         Serial.println("Motion sensor value: ");
@@ -168,27 +173,33 @@ void loop() {
       break;
     case 4:
       // Shining laser (active)
-      long timeActive;
-      timeActive = millis() - changedModeTime;
+      long totalTimeActive;
+      totalTimeActive = millis() - changedModeTime;
 
-      int cycleTime; // cycleTime represents how far through the rotation we are. timeActive goes from 0 to 30 seconds, cycletime goes from 0 to 3 seconds over and over
-      cycleTime = timeActive % 3000; // % is modulo in c
+      int cycleTime; // cycleTime represents how far through the rotation we are. totalTimeActive increases only, cycletime goes from 0 to 3 seconds over and over
+      int positionDuration;
+
+      cycleTime = totalTimeActive % cycleLength;
+
+      // Calculate the duration of each position in the cycle
+      positionDuration = cycleLength / 3;
+
 
       int smallServoPos, bigServoPos;
 
-      if (cycleTime < 1000) {
+      if (cycleTime < positionDuration) {
           // Interpolate between userXPos1/userZPos1 and userXPos2/userZPos2
-          float t = cycleTime / 1000.0;
+          float t = cycleTime / float(positionDuration);
           smallServoPos = userXPos1 + t * (userXPos2 - userXPos1);
           bigServoPos = userZPos1 + t * (userZPos2 - userZPos1);
-      } else if (cycleTime < 2000) {
+      } else if (cycleTime < 2 * positionDuration) {
           // Interpolate between userXPos2/userZPos2 and userXPos3/userZPos3
-          float t = (cycleTime - 1000) / 1000.0;
+          float t = (cycleTime - positionDuration) / float(positionDuration);
           smallServoPos = userXPos2 + t * (userXPos3 - userXPos2);
           bigServoPos = userZPos2 + t * (userZPos3 - userZPos2);
       } else {
           // Interpolate between userXPos3/userZPos3 and userXPos1/userZPos1
-          float t = (cycleTime - 2000) / 1000.0;
+          float t = (cycleTime - 2 * positionDuration) / float(positionDuration);
           smallServoPos = userXPos3 + t * (userXPos1 - userXPos3);
           bigServoPos = userZPos3 + t * (userZPos1 - userZPos3);
       }
@@ -197,7 +208,7 @@ void loop() {
       bigServo.write(bigServoPos);
       
 
-      if (timeActive > 30000) { // If we've been active for 20 seconds
+      if (totalTimeActive > laserShiningTime) { // If we've been active for long enough
           changeTurretMode(3);
       }
 
@@ -208,14 +219,14 @@ void loop() {
 
     case 5:
       // dispenseTreats
-      timeActive = millis() - changedModeTime;
+      totalTimeActive = millis() - changedModeTime;
 
-      digitalWrite(7, HIGH);
+      digitalWrite(pmdcPin, HIGH);
 
-      if (timeActive > 5000) {
+      if (totalTimeActive > treatDispenseTime) {
+        digitalWrite(pmdcPin, LOW);
         changeTurretMode(3);
-      }
-      
+      }    
 
       break;   
     
@@ -239,8 +250,8 @@ void changeTurretMode(int requestedMode) { // Use this instead of mode = X becau
   Serial.println(requestedMode);
   changedModeTime = millis(); // Save the time at which we changed mode. This is helpful when figuring out how long we've been in the latest mode
 
-  if (requestedMode == 4 or requestedMode == 2) { // if we're going into active mode, switch on the laser. (And vice versa)
-    digitalWrite(5, HIGH); // set the voltage at the pin to be high
+  if (requestedMode == 4 or requestedMode == 2) { // if we're going into active/manual mode, switch on the laser. (And vice versa)
+    digitalWrite(5, HIGH); // set the voltage at the pin to be high (powering the laser)
   } else {
     digitalWrite(5, LOW);
   }
