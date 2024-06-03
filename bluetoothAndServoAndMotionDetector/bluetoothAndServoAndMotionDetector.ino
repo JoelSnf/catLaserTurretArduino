@@ -17,6 +17,8 @@ int cycleLength = 3000 ; // Time between for laser to be position x and looping 
 int treatDispenseTime = 5000 ; // Amount of time to spend dispensing treats. In milliseconds
 
 int activesPerTreatDispense = 3; // Amount of times the turret activates before it will dispense treats.
+int treatDispenseCounter = 0; // counts up each time we go active
+bool dispenseTreatsASAP = false;
 
 const int motionSensorPin = A2;
 const int pmdcPin = 7;
@@ -114,12 +116,12 @@ void loop() {
   }
   
 
-
+  // This switch corresponds to the mode we're in. Heres the meaning of each mode:
   // mode 1 = inactive (Powered but not activated by user , or because it's been knocked over)
   // mode 2 = manualControl (user moves the servos)
   // mode 3 = scanning (watching for movement)
   // mode 4 = active (shining laser)
-  // mode 5 = dispenseTreats (dispensing treats)
+  // mode 5 = dispenseTreats
   switch (mode) {
     case 1:
       // inactive 
@@ -204,17 +206,21 @@ void loop() {
           bigServoPos = userZPos3 + t * (userZPos1 - userZPos3);
       }
 
-      smallServo.write(smallServoPos);
-      bigServo.write(bigServoPos);
-      
-
       if (totalTimeActive > laserShiningTime) { // If we've been active for long enough
-          changeTurretMode(3);
+          smallServoPos = userXPos1;
+          bigServoPos = userZPos1;
+
+          if (dispenseTreatsASAP) { // see changeTurretMode() for an explanation of dispenseTreatsASAP
+            changeTurretMode(5);
+          } else {
+            changeTurretMode(3);
+          }                    
       }
 
-      // if timeHasPassed:
-      //     mode = 1
-      // or maybe mode = 5 - dispense treats
+      smallServo.write(smallServoPos);
+      bigServo.write(bigServoPos);      
+
+      
       break;
 
     case 5:
@@ -244,6 +250,15 @@ bool checkIfMovement() { // Credit to Tom for this function ! And for adjusting 
 }
 
 void changeTurretMode(int requestedMode) { // Use this instead of mode = X because it updates changedModeTime, prints to serial, and updates bluetooth.
+  if (requestedMode == 4) {
+    treatDispenseCounter += 1;
+
+    if (treatDispenseCounter >= activesPerTreatDispense) {
+      treatDispenseCounter = 0;
+      dispenseTreatsASAP = true;
+    }    
+  }  
+  
   mode = requestedMode;
   modeSwitchCharacteristic.writeValue(requestedMode); // update the bluetooth characteristic so the app knows what state the system is in (This doesn't seem to work ! BUGGED)
   Serial.println("Changing to mode:");
