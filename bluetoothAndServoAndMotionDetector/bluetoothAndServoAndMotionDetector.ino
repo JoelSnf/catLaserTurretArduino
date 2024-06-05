@@ -20,6 +20,8 @@ int activesPerTreatDispense = 3; // Amount of times the turret activates before 
 int treatDispenseCounter = 0; // counts up each time we go active
 bool dispenseTreatsASAP = false;
 
+int timesActivated = 0;
+
 const int motionSensorPin = A2;
 const int pmdcPin = 7;
 
@@ -39,6 +41,8 @@ long changedModeTime = 0;
 
 bool bluetoothAdvertising = true;
 
+// 'Main' Characteristics
+
 BLEService bleService("180A");
 BLEByteCharacteristic modeSwitchCharacteristic("2A57", BLERead | BLEWrite);
 
@@ -46,6 +50,16 @@ BLEByteCharacteristic manualAngleZControl("1A57", BLERead | BLEWrite);
 BLEByteCharacteristic manualAngleXControl("0A57", BLERead | BLEWrite);
 
 BLEByteCharacteristic saveCurrentPosition("1A58", BLERead | BLEWrite);
+
+// 'Settings' characteristics
+
+BLEByteCharacteristic laserShiningTimeCharacteristic("3A50", BLERead | BLEWrite);
+BLEByteCharacteristic cooldownPeriodCharacteristic("3A51", BLERead | BLEWrite);
+BLEByteCharacteristic cycleLengthCharacteristic("3A52", BLERead | BLEWrite);
+BLEByteCharacteristic treatDispenseTimeCharacteristic("3A53", BLERead | BLEWrite);
+BLEByteCharacteristic activesPerTreatDispenseCharacteristic("3A54", BLERead | BLEWrite);
+
+BLEByteCharacteristic timesActivatedCharacteristic("3A55", BLERead | BLEWrite); // this is tracked for the user's interest
 
 void bluetoothSetup() {
   Serial.println("Running bluetooth setup...");
@@ -58,7 +72,7 @@ void bluetoothSetup() {
   BLE.setLocalName("Cat laser turret");
   BLE.setAdvertisedService(bleService);
 
-  // add the characteristics to the service
+  // add the 'main' characteristics to the service
   bleService.addCharacteristic(modeSwitchCharacteristic); // characteristic for changing turret state (ie, active, scanning)
 
   bleService.addCharacteristic(manualAngleZControl); // characteristic for manual Z control
@@ -66,10 +80,19 @@ void bluetoothSetup() {
 
   bleService.addCharacteristic(saveCurrentPosition); // characteristic for saving the current position
 
+  // Adding the 'Settings' characteristics
+  bleService.addCharacteristic(laserShiningTimeCharacteristic);
+  bleService.addCharacteristic(cooldownPeriodCharacteristic);
+  bleService.addCharacteristic(cycleLengthCharacteristic);
+  bleService.addCharacteristic(treatDispenseTimeCharacteristic);
+  bleService.addCharacteristic(activesPerTreatDispenseCharacteristic);
+  bleService.addCharacteristic(timesActivatedCharacteristic);
+
+
   // add service
   BLE.addService(bleService);
 
-  // set the initial value for the characteristic:
+  // set the initial value for the characteristics:
   modeSwitchCharacteristic.writeValue(mode);
 
   manualAngleZControl.writeValue(angleZ);
@@ -103,9 +126,10 @@ void loop() {
       Serial.println("Connected!");
       Serial.println(central.deviceName());
     }
-    if (modeSwitchCharacteristic.written()){
-      changeTurretMode(modeSwitchCharacteristic.value());  // update mode            
-    }    
+
+    checkIfSettingsHaveChanged();
+
+
   }
   if (central.connected() == false) {
     if (bluetoothAdvertising == false) {
@@ -239,10 +263,19 @@ void loop() {
   }
 }
 
+void checkIfSettingsHaveChanged() {
+  if (modeSwitchCharacteristic.written()){
+      changeTurretMode(modeSwitchCharacteristic.value());  // update mode            
+    }  
+}
+
+
 bool checkIfMovement() { // Credit to Tom for this function ! And for adjusting the motion sensor
   int pirState = analogRead(motionSensorPin); // pir= passive infrared. (The motion sensor)
   if (pirState > 600) {
-  return true;
+    timesActivated += 1;
+    timesActivatedCharacteristic.writeValue(timesActivated);
+    return true;
   }
   else {
     return false;
@@ -269,5 +302,9 @@ void changeTurretMode(int requestedMode) { // Use this instead of mode = X becau
     digitalWrite(5, HIGH); // set the voltage at the pin to be high (powering the laser)
   } else {
     digitalWrite(5, LOW);
+  }
+
+  if (requestedMode != 5) {
+    digitalWrite(pmdcPin, LOW);
   }
 }
