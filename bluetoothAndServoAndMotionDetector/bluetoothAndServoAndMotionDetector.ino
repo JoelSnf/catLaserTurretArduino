@@ -15,8 +15,8 @@ int laserShiningTime = 20000 ; // Time to shine the laser, in milliseconds
 int cooldownPeriod = 2000 ; // Time between turning laser off and re-activating, in milliseconds.
 int cycleLength = 3000 ; // Time between for laser to be position x and looping back to position x. in milliseconds 
 int treatDispenseTime = 5000 ; // Amount of time to spend dispensing treats. In milliseconds
-
 int activesPerTreatDispense = 3; // Amount of times the turret activates before it will dispense treats.
+
 int treatDispenseCounter = 0; // counts up each time we go active
 bool dispenseTreatsASAP = false;
 
@@ -265,8 +265,35 @@ void loop() {
 
 void checkIfSettingsHaveChanged() {
   if (modeSwitchCharacteristic.written()){
-      changeTurretMode(modeSwitchCharacteristic.value());  // update mode            
+      changeTurretMode(modeSwitchCharacteristic.value());  // update mode   
+      Serial.println(modeSwitchCharacteristic.value());     
+    }
+
+  if (laserShiningTimeCharacteristic.written()){
+      changeTurretMode(laserShiningTimeCharacteristic.value() * 1000);     
+      Serial.println(laserShiningTimeCharacteristic.value()); 
+    }
+    
+  if (cooldownPeriodCharacteristic.written()){
+      changeTurretMode(cooldownPeriodCharacteristic.value() * 1000);     
+      Serial.println(cooldownPeriodCharacteristic.value()); 
+    }
+  
+  if (cycleLengthCharacteristic.written()){
+      changeTurretMode(cycleLengthCharacteristic.value() * 1000);       
+      Serial.println(cycleLengthCharacteristic.value()); 
+    }
+
+  if (treatDispenseTimeCharacteristic.written()){
+      changeTurretMode(treatDispenseTimeCharacteristic.value() * 1000);   
+      Serial.println(treatDispenseTimeCharacteristic.value());       
+    }
+    
+  if (activesPerTreatDispenseCharacteristic.written()){
+      changeTurretMode(activesPerTreatDispenseCharacteristic.value());      
+      Serial.println(activesPerTreatDispenseCharacteristic.value());        
     }  
+
 }
 
 
