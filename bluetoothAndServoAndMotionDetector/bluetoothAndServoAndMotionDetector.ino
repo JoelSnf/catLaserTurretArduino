@@ -1,5 +1,6 @@
 #include <ArduinoBLE.h> // This bluetooth library needs to be installed
 #include <Servo.h> // This one is built-in
+#include <cstdint> // This apparently contains the datatype 'uint8_t', which is handy
 
 Servo bigServo; // pin 9
 Servo smallServo; // pin 10
@@ -9,7 +10,7 @@ Servo smallServo; // pin 10
 // mode 3 = scanning (watching for movement)
 // mode 4 = active (shining laser)
 // mode 5 = dispenseTreats (dispensing treats)
-int mode = 5; // I would have used strings instead of integers to represent modes but I keen on saving memory
+int mode = 1; // I would have used strings instead of integers to represent modes but I keen on saving memory
 
 int laserShiningTime = 20000 ; // Time to shine the laser, in milliseconds
 int cooldownPeriod = 2000 ; // Time between turning laser off and re-activating, in milliseconds.
@@ -20,10 +21,10 @@ int activesPerTreatDispense = 3; // Amount of times the turret activates before 
 int treatDispenseCounter = 0; // counts up each time we go active
 bool dispenseTreatsASAP = false;
 
-int timesActivated = 0;
+uint8_t timesActivated = 0;
 
 const int motionSensorPin = A2;
-const int pmdcPin = 7;
+const int pmdcPin = 12;
 
 int angleZ = 135;
 int angleX = 90;
@@ -251,10 +252,10 @@ void loop() {
       // dispenseTreats
       totalTimeActive = millis() - changedModeTime;
 
-      digitalWrite(pmdcPin, HIGH);
+      analogWrite(pmdcPin, 127);
 
       if (totalTimeActive > treatDispenseTime) {
-        digitalWrite(pmdcPin, LOW);
+        analogWrite(pmdcPin, 0);
         changeTurretMode(3);
       }    
 
@@ -329,6 +330,9 @@ void changeTurretMode(int requestedMode) { // Use this instead of mode = X becau
     digitalWrite(5, HIGH); // set the voltage at the pin to be high (powering the laser)
   } else {
     digitalWrite(5, LOW);
+
+    smallServo.write(userXPos1);
+    bigServo.write(userZPos1);    
   }
 
   if (requestedMode != 5) {
